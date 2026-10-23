@@ -27,12 +27,13 @@ def load_urls(path: str, limit: int | None = None) -> list[str]:
 
 
 async def fetch(client: httpx.AsyncClient, url: str, sem: asyncio.Semaphore, stat: dict) -> list[str]:
+    canonical = url.rstrip("/").rsplit("/", 1)[-1]
     async with sem:
         for attempt in range(3):
             try:
                 r = await client.get(url)
                 r.raise_for_status()
-                lines = parse_page(r.text)
+                lines = parse_page(r.text, canonical)
                 stat["ok"] += 1
                 if not lines:
                     stat["empty"] += 1

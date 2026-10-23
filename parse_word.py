@@ -6,6 +6,7 @@ import sys
 
 import httpx
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 
 POS_MAP = {
     "Существительное": "noun",
@@ -74,6 +75,15 @@ def row_labels(grid: dict, thead_rows: int, r: int, c0: int) -> list[str]:
         cell = grid.get((r, c))
         if cell is not None and cell.name == "th":
             txt = clean(cell.get_text(" ", strip=True))
+            if re.fullmatch(r"[123]-е", txt):
+                # значения столбца «Лицо»: «1-е» → «1-е лицо»
+                hdr = next(
+                    (clean(grid[(hr, c)].get_text(" ", strip=True))
+                     for hr in range(thead_rows) if (hr, c) in grid),
+                    "",
+                )
+                if "Лицо" in hdr:
+                    txt += " лицо"
             if txt and txt not in labels:
                 labels.append(txt)
     return labels
@@ -97,8 +107,22 @@ def cell_words(td) -> list[str]:
     return words
 
 
-def table_forms(table) -> list[tuple[str, list[str]]]:
-    """(слово, подпись формы) для всех ячеек одной conjugation-таблицы."""
+def transcribe(container) -> str:
+    """Русская транскрипция; после ударной гласной (выделена <b>) — апостроф."""
+    t = container.select_one("div.transcription")
+    if not t:
+        return ""
+    parts = []
+    for child in t.children:
+        if isinstance(child, NavigableString):
+            parts.append(str(child))
+        elif getattr(child, "name", None) == "b":
+            parts.append(clean(child.get_text()) + "'")
+    return re.sub(r"\s+", "", "".join(parts)).rstrip("!").strip()
+
+
+def table_forms(table) -> list[tuple[str, list[str], str]]:
+    """(слово, подпись формы, транскрипция) для всех ячеек одной таблицы."""
     grid, thead_rows = build_grid(table)
     out = []
     seen = set()
@@ -112,12 +136,23 @@ def table_forms(table) -> list[tuple[str, list[str]]]:
             c1 += 1
         # порядок: сначала столбцы, потом строка
         labels = column_labels(grid, thead_rows, c, c1) + row_labels(grid, thead_rows, r, c)
+        tr = transcribe(cell)
         for w in cell_words(cell):
-            out.append((w, labels))
+            out.append((w, labels, tr))
     return out
 
 
-def parse_page(html: str) -> list[str]:
+def lemma_from_h2(h2) -> str:
+    """Лемма из заголовка: убрать префиксы и ссылку на сайт."""
+    h2 = BeautifulSoup(str(h2), "lxml").find("h2")  # копия, чтобы не портить оригинал
+    span = h2.select_one("span.visible-print-inline")
+    if span:
+        span.decompose()
+    txt = clean(h2.get_text(" ", strip=True))
+    return re.sub(r"^(Формы слова|Спряжение глагола)\s+", "", txt).strip()
+
+
+def parse_page(html: str, canonical: str = "") -> list[str]:
     soup = BeautifulSoup(html, "lxml")
 
     lead = soup.select_one("div.lead")
@@ -142,13 +177,30 @@ def parse_page(html: str) -> list[str]:
             continue
         m = re.search(r"Биньян\s+(\S+)", section)
         binyan = m.group(1) if m else None
-        for word, labels in table_forms(el):
+        for word, labels, tr in table_forms(el):
             val: dict = {"pos": pos}
             if binyan:
                 val["binyan"] = binyan
+            val["canonical"] = canonical
             val["form"] = labels
+            if tr:
+                val["transcription"] = tr
             val["translation"] = translation
             lines.append(json.dumps({word: val}, ensure_ascii=False))
+
+    # Страницы без таблиц форм (союзы, предлоги...): лемма без ключа form
+    if not lines and h2:
+        lemma = lemma_from_h2(h2)
+        if lemma:
+            val = {"pos": pos, "canonical": canonical}
+            # транскрипция леммы лежит во втором div.lead рядом с формой
+            tr_el = soup.select_one("div.lead div.transcription")
+            if tr_el:
+                tr = transcribe(tr_el.parent)
+                if tr:
+                    val["transcription"] = tr
+            val["translation"] = translation
+            lines.append(json.dumps({lemma: val}, ensure_ascii=False))
     return lines
 
 
@@ -157,7 +209,8 @@ def main() -> None:
         r = httpx.get(url, timeout=30, follow_redirects=True,
                       headers={"User-Agent": "Mozilla/5.0 (compatible; pealim-dict-scraper/0.1)"})
         r.raise_for_status()
-        for line in parse_page(r.text):
+        canonical = url.rstrip("/").rsplit("/", 1)[-1]
+        for line in parse_page(r.text, canonical):
             print(line)
 
 
