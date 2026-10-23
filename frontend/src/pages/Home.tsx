@@ -60,12 +60,19 @@ export default function Home() {
         <>
           <p className="status">
             «{status.query}» — найдено строк: {status.rows.length}
+            {status.rows.some((r) => r.via_prefix) &&
+              ` (из них по профору: ${status.rows.filter((r) => r.via_prefix).length})`}
           </p>
           <ol className="results">
             {status.rows.map((row, i) => (
               <li key={`${row.canonical}|${row.word}|${i}`}>
                 <span className="word">{row.word}</span>
                 {row.transcription && <span className="transcription"> {row.transcription}</span>}
+                {row.via_prefix && (
+                  <span className="via-prefix">
+                    {row.via_prefix}+{row.no_nikud}
+                  </span>
+                )}
                 <span className="meta">
                   {(() => {
                     const parts = [

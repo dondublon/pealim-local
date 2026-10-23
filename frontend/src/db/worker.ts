@@ -8,6 +8,7 @@
 import initSqlJs from 'sql.js';
 import type { Database } from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+import { prefixExtras } from './prefixes';
 import type { SearchMethod, SearchRequest, SearchResponse } from './protocol';
 import type { FormRow } from './types';
 
@@ -78,22 +79,39 @@ const ctx = self as unknown as {
   postMessage(message: SearchResponse): void;
 };
 
+function queryRows(db: Database, sql: string, arg: string): FormRow[] {
+  const stmt = db.prepare(sql);
+  try {
+    stmt.bind([arg]);
+    const rows: FormRow[] = [];
+    while (stmt.step()) {
+      rows.push(toFormRow(stmt.getAsObject() as Record<string, unknown>));
+    }
+    return rows;
+  } finally {
+    stmt.free();
+  }
+}
+
+/** Поиск no_nikud: точное совпадение + строки по профору (если запрос с профором). */
+function searchByNoNikud(db: Database, query: string): FormRow[] {
+  const exact = queryRows(db, SQL.searchByNoNikud, query);
+  const extras = prefixExtras(query, (rest) =>
+    queryRows(db, SQL.searchByNoNikud, rest),
+  );
+  return [...exact, ...extras];
+}
+
 ctx.onmessage = (e) => {
   const { id, method, arg } = e.data;
   void (async () => {
     try {
       const db = await getDb();
-      const stmt = db.prepare(SQL[method]);
-      try {
-        stmt.bind([arg]);
-        const rows: FormRow[] = [];
-        while (stmt.step()) {
-          rows.push(toFormRow(stmt.getAsObject() as Record<string, unknown>));
-        }
-        ctx.postMessage({ id, ok: true, rows });
-      } finally {
-        stmt.free();
-      }
+      const rows =
+        method === 'searchByNoNikud'
+          ? searchByNoNikud(db, arg)
+          : queryRows(db, SQL[method], arg);
+      ctx.postMessage({ id, ok: true, rows });
     } catch (err) {
       ctx.postMessage({
         id,
