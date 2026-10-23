@@ -98,36 +98,54 @@ def row_labels(grid: dict, thead_rows: int, r: int, c0: int) -> list[str]:
     return labels
 
 
-def cell_words(td) -> list[str]:
-    """Слова ячейки: вариант с никкудом + вариант после '~' (если есть)."""
-    words = []
-    mk = td.select_one("span.menukad")
-    if mk:
-        w = clean(mk.get_text(strip=True)).rstrip("!").strip()
-        if w:
-            words.append(w)
-    ch = td.select_one("span.chaser")
-    if ch:
-        t = clean(ch.get_text(strip=True))
-        if t.startswith("~"):
-            v = t.lstrip("~").strip()
-            if v:
-                words.append(v)
-    return words
-
-
-def transcribe(container) -> str:
-    """Русская транскрипция; после ударной гласной (выделена <b>) — апостроф."""
-    t = container.select_one("div.transcription")
-    if not t:
-        return ""
+def transcription_text(el) -> str:
+    """Текст транскрипции; после ударной гласной (выделена <b>) — апостроф."""
     parts = []
-    for child in t.children:
+    for child in el.children:
         if isinstance(child, NavigableString):
             parts.append(str(child))
         elif getattr(child, "name", None) == "b":
             parts.append(clean(child.get_text()) + "'")
     return re.sub(r"\s+", "", "".join(parts)).rstrip("!").strip()
+
+
+def cell_forms(cell) -> list[tuple[list[str], str]]:
+    """Все формы ячейки: (варианты слова, транскрипция).
+
+    В одной ячейке сайта может быть несколько форм (альтернативы,
+    «В разговорном языке», поповеры) — у каждой свой menukad и своя
+    транскрипция. Вариант после '~' идёт сразу после menukad и делят
+    с ним транскрипцию.
+    """
+    forms: list[tuple[list[str], str]] = []
+    words: list[str] = []
+    tr = ""
+    opened = False
+
+    def flush() -> None:
+        nonlocal words, tr, opened
+        if opened and words:
+            forms.append((words, tr))
+        words, tr, opened = [], "", False
+
+    for el in cell.select("span.menukad, span.chaser, .transcription"):
+        classes = el.get("class") or []
+        if "menukad" in classes:
+            flush()
+            w = clean(el.get_text(strip=True)).rstrip("!").strip()
+            words = [w] if w else []
+            opened = bool(words)
+        elif opened and "chaser" in classes:
+            t = clean(el.get_text(strip=True))
+            if t.startswith("~"):
+                v = t.lstrip("~").strip()
+                if v:
+                    words.append(v)
+        elif opened and "transcription" in classes and not tr:
+            tr = transcription_text(el)
+            flush()
+    flush()
+    return forms
 
 
 def table_forms(table) -> list[tuple[str, list[str], str]]:
@@ -157,9 +175,9 @@ def table_forms(table) -> list[tuple[str, list[str], str]]:
                 for lab in col_labs
             ]
         labels = col_labs + row_labels(grid, thead_rows, r, c)
-        tr = transcribe(cell)
-        for w in cell_words(cell):
-            out.append((w, labels, tr))
+        for words, tr in cell_forms(cell):
+            for w in words:
+                out.append((w, labels, tr))
     return out
 
 
