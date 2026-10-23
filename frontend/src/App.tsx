@@ -1,4 +1,4 @@
-import Canonic from './pages/Canonic';
+import Canonic from './pages/canonic/Canonic';
 import Home from './pages/Home';
 import { useCurrentPath } from './router';
 
