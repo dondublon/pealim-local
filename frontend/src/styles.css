@@ -98,3 +98,20 @@ button:disabled {
 .results .translation {
   display: block;
 }
+
+.results .root {
+  display: block;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.results .root b {
+  font-size: 1.1rem;
+}
+
+.results .description {
+  display: block;
+  font-size: 0.8rem;
+  color: #777;
+  white-space: pre-line;
+}
