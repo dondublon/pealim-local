@@ -152,3 +152,31 @@ a {
   color: #666;
   white-space: pre-line;
 }
+
+.pos-section {
+  margin-top: 20px;
+}
+
+.pos-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #2f5fa8;
+}
+
+.binyan {
+  margin-top: 14px;
+}
+
+.binyan-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: #2f5fa8;
+}
+
+.pos-section.stub .status {
+  color: #999;
+  font-style: italic;
+}
