@@ -1,12 +1,20 @@
+import SearchForm from './components/SearchForm';
 import Canonic from './pages/canonic/Canonic';
 import Home from './pages/Home';
-import { useCurrentPath } from './router';
+import { navigate, useLocation } from './router';
 
 export default function App() {
-  const path = useCurrentPath();
-  const match = /^\/canonic\/([^/]+)\/?$/.exec(path);
-  if (match) {
-    return <Canonic canonical={decodeURIComponent(match[1])} />;
-  }
-  return <Home />;
+  const { pathname, search } = useLocation();
+  const urlQuery = new URLSearchParams(search).get('q') ?? '';
+  const match = /^\/canonic\/([^/]+)\/?$/.exec(pathname);
+
+  return (
+    <main>
+      <SearchForm
+        queryFromUrl={urlQuery}
+        onSearch={(q) => navigate(q ? `/?q=${encodeURIComponent(q)}` : '/')}
+      />
+      {match ? <Canonic canonical={decodeURIComponent(match[1])} /> : <Home />}
+    </main>
+  );
 }

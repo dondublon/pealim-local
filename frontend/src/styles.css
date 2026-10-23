@@ -26,6 +26,10 @@ form {
   gap: 8px;
 }
 
+.search-form {
+  margin-bottom: 14px;
+}
+
 input[type='text'] {
   flex: 1;
   padding: 8px 12px;

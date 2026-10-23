@@ -4,15 +4,28 @@
  */
 import { useEffect, useState } from 'react';
 
-/** Текущий pathname, обновляется при навигации (кнопки «назад/вперёд» и pushState). */
-export function useCurrentPath(): string {
-  const [path, setPath] = useState(() => window.location.pathname);
+export interface Location {
+  pathname: string;
+  search: string;
+}
+
+/**
+ * Текущая локация (pathname + search), обновляется при любой навигации
+ * (pushState и кнопки «назад/вперёд»). Объект новый при каждом событии,
+ * поэтому и изменение только query-строкы перерисовывает слушателей.
+ */
+export function useLocation(): Location {
+  const [loc, setLoc] = useState<Location>(() => ({
+    pathname: window.location.pathname,
+    search: window.location.search,
+  }));
   useEffect(() => {
-    const update = () => setPath(window.location.pathname);
+    const update = () =>
+      setLoc({ pathname: window.location.pathname, search: window.location.search });
     window.addEventListener('popstate', update);
     return () => window.removeEventListener('popstate', update);
   }, []);
-  return path;
+  return loc;
 }
 
 /** Переход без перезагрузки страницы. */

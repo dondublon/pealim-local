@@ -52,7 +52,7 @@ export default function Canonic({ canonical }: { canonical: string }) {
   }
 
   return (
-    <main>
+    <>
       <p className="back">
         <Link to="/">← на главную</Link>
       </p>
@@ -94,6 +94,6 @@ export default function Canonic({ canonical }: { canonical: string }) {
           })}
         </>
       )}
-    </main>
+    </>
   );
 }

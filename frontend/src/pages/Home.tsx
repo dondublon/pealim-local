@@ -1,54 +1,59 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createDictionary } from '../db';
 import type { FormRow } from '../db';
-import { Link } from '../router';
+import { Link, useLocation } from '../router';
 
 const dictionary = createDictionary();
 
 type Status =
   | { phase: 'idle' }
-  | { phase: 'loading' } // первый поиск: грузится wasm + база
+  | { phase: 'loading' }
   | { phase: 'done'; rows: FormRow[]; query: string }
   | { phase: 'error'; message: string };
 
+/**
+ * Главная страница: результаты поиска по ?q= в URL.
+ * Поле ввода живёт на уровне App (SearchForm) — сюда приходит только
+ * готовый запрос.
+ */
 export default function Home() {
-  const [query, setQuery] = useState('');
+  const { search } = useLocation();
+  const q = new URLSearchParams(search).get('q') ?? '';
   const [status, setStatus] = useState<Status>({ phase: 'idle' });
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    setStatus({ phase: 'loading' });
-    try {
-      const rows = await dictionary.searchByNoNikud(q);
-      setStatus({ phase: 'done', rows, query: q });
-    } catch (err) {
-      setStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err) });
+  useEffect(() => {
+    if (!q) {
+      setStatus({ phase: 'idle' });
+      return;
     }
-  }
+    let cancelled = false;
+    setStatus({ phase: 'loading' });
+    dictionary
+      .searchByNoNikud(q)
+      .then((rows) => {
+        if (!cancelled) setStatus({ phase: 'done', rows, query: q });
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setStatus({
+            phase: 'error',
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [q]);
 
   return (
-    <main>
+    <>
       <h1>pealim — поиск по словарю</h1>
 
-      <form onSubmit={onSubmit}>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Слово без огласовок, например: אב"
-          dir="auto"
-          autoFocus
-        />
-        <button type="submit" disabled={status.phase === 'loading'}>
-          Искать
-        </button>
-      </form>
-
-      {status.phase === 'loading' && (
-        <p className="status">Загрузка базы (≈108 МБ, первый запрос)…</p>
+      {status.phase === 'idle' && (
+        <p className="status">Введите слово — с огласовками или без, и нажмите «Искать».</p>
       )}
+      {status.phase === 'loading' && <p className="status">Ищу…</p>}
       {status.phase === 'error' && <p className="status error">Ошибка: {status.message}</p>}
 
       {status.phase === 'done' && (
@@ -91,6 +96,6 @@ export default function Home() {
           </ol>
         </>
       )}
-    </main>
+    </>
   );
 }
