@@ -63,7 +63,7 @@ export function createSqliteDictionary(): Dictionary {
     return dbPromise;
   }
 
-  async function query(sql: string, params: string[]): Promise<FormRow[]> {
+  async function runSql(sql: string, params: string[]): Promise<FormRow[]> {
     const db = await getDb();
     const stmt = db.prepare(sql);
     try {
@@ -80,14 +80,14 @@ export function createSqliteDictionary(): Dictionary {
 
   return {
     searchByNoNikud(query: string): Promise<FormRow[]> {
-      return query(`${SELECT_COLUMNS} WHERE f.no_nikud = ?`, [
+      return runSql(`${SELECT_COLUMNS} WHERE f.no_nikud = ?`, [
         stripNikud(query.trim()),
       ]);
     },
 
     searchByCanonical(canonical: string): Promise<FormRow[]> {
       // id — surrogate PK в порядке загрузки = порядке форм на странице
-      return query(`${SELECT_COLUMNS} WHERE f.canonical = ? ORDER BY f.id`, [
+      return runSql(`${SELECT_COLUMNS} WHERE f.canonical = ? ORDER BY f.id`, [
         canonical.trim(),
       ]);
     },
