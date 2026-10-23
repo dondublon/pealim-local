@@ -22,6 +22,29 @@ POS_MAP = {
     "Междометие": "interjection",
 }
 
+# Подписи форм со страниц → ключи в form (значения остаются как на сайте)
+LABEL_KEYS = {
+    "Единственное число": "number",
+    "Множественное число": "number",
+    "Единственное": "number",
+    "Множественное": "number",
+    "Единственное число владельцев": "num_owners",
+    "Множественное число владельцев": "num_owners",
+    "Мужской род": "gender",
+    "Женский род": "gender",
+    "1-е лицо": "person",
+    "2-е лицо": "person",
+    "3-е лицо": "person",
+    "Будущее время": "tense",
+    "Прошедшее время": "tense",
+    "Настоящее время / причастие": "tense",
+    "Повелительное наклонение": "tense",
+    "Инфинитив": "tense",
+    "Абсолютное состояние": "state",
+    "Сопряженное состояние": "state",
+    "Без местоименных окончаний": "suffixes",
+}
+
 
 def clean(s: str) -> str:
     """Убрать невидимые символы (RTL mark и т.п.)."""
@@ -34,6 +57,18 @@ def strip_nikud(w: str) -> str:
         ch for ch in w
         if not (0x0591 <= ord(ch) <= 0x05C7 and ord(ch) != 0x05BE)
     )
+
+
+def labels_to_form(labels: list[str]) -> dict:
+    """Подписи формы → dict {ключ: подпись}; неизвестные подписи — на stderr."""
+    form: dict = {}
+    for lab in labels:
+        key = LABEL_KEYS.get(lab)
+        if key is None:
+            print(f"WARN: неизвестная подпись формы: {lab!r}", file=sys.stderr)
+            continue
+        form[key] = lab
+    return form
 
 
 def build_grid(table) -> tuple[dict, int]:
@@ -181,6 +216,36 @@ def table_forms(table) -> list[tuple[str, list[str], str]]:
     return out
 
 
+def parse_general(html: str) -> dict:
+    """Корень и примечания страницы: {"root": ..., "description": ...}.
+
+    Корень — из <p> «Корень: א - ב - ב» (без никкуда и разделителей).
+    Примечания — абзацы между первым <p> (часть речи) и первым h3,
+    склеенные через пустую строку. Отсутствующие значения — "".
+    """
+    soup = BeautifulSoup(html, "lxml")
+    h2 = soup.select_one("h2.page-header")
+    root, notes = "", []
+    if h2:
+        seen_pos = False
+        for el in h2.find_all_next():
+            if el.name == "h3":
+                break
+            if el.name != "p":
+                continue
+            txt = clean(el.get_text(" ", strip=True))
+            if not seen_pos:
+                seen_pos = True  # первый <p> — часть речи, не примечание
+                continue
+            if txt.startswith("Корень:"):
+                mk = el.select_one("span.menukad")
+                raw = mk.get_text(strip=True) if mk else txt.removeprefix("Корень:").strip()
+                root = re.sub(r"\s*-\s*", "", strip_nikud(raw))
+            elif txt:
+                notes.append(txt)
+    return {"root": root, "description": "\n\n".join(notes)}
+
+
 def lemma_from_h2(h2) -> str:
     """Лемма из заголовка: убрать префиксы и ссылку на сайт."""
     h2 = BeautifulSoup(str(h2), "lxml").find("h2")  # копия, чтобы не портить оригинал
@@ -197,16 +262,56 @@ def parse_page(html: str, canonical: str = "") -> list[str]:
     lead = soup.select_one("div.lead")
     translation = clean(lead.get_text(" ", strip=True)) if lead else ""
 
-    pos = "unknown"
+    # pos=None — сайт не указал часть речи (יֵשׁ, אֵין: «–»), ключ не добавляем
+    pos = None
     h2 = soup.select_one("h2.page-header")
     if h2:
         p = h2.find_next_sibling("p")
         if p:
             txt = clean(p.get_text(" ", strip=True))
-            name = re.split(r"\s+[–—-]\s+", txt, maxsplit=1)[0].strip()
-            pos = POS_MAP.get(name, name.lower())
+            if txt and txt not in ("–", "-", "—"):
+                name = re.split(r"\s+[–—-]\s+", txt, maxsplit=1)[0].strip()
+                if name:
+                    pos = POS_MAP.get(name, name.lower())
 
-    lines = []
+    lines: list[str] = []
+    seen: set = set()
+
+    def emit(word: str, labels: list[str] | None, tr: str, binyan: str | None = None) -> None:
+        key = (word, tuple(labels) if labels else (), binyan)
+        if key in seen:
+            return
+        seen.add(key)
+        val: dict = {}
+        if pos:
+            val["pos"] = pos
+        if binyan:
+            val["binyan"] = binyan
+        val["canonical"] = canonical
+        val["no_nikud"] = strip_nikud(word)
+        if labels is not None:
+            val["form"] = labels_to_form(labels)
+        if tr:
+            val["transcription"] = tr
+        val["translation"] = translation
+        lines.append(json.dumps({word: val}, ensure_ascii=False))
+
+    # Основная форма вне таблицы: div после заголовка «Форма …» (ед. ч.)
+    # — предлоги, יֵשׁ, אֵין и т.п. (у «Формы …» (мн. ч.) внутри таблицы)
+    for h3 in soup.find_all("h3"):
+        title = clean(h3.get_text(" ", strip=True))
+        if not title.startswith("Форма "):
+            continue
+        sib = next((s for s in h3.next_siblings if getattr(s, "name", None)), None)
+        if sib is None or sib.name != "div":
+            continue
+        label = title.removeprefix("Форма ").strip()
+        label = label[0].upper() + label[1:] if label else title
+        for words, tr in cell_forms(sib):
+            for w in words:
+                emit(w, [label], tr)
+
+    # Таблицы форм (в т.ч. биньяны глагола)
     section = ""
     for el in soup.find_all(["h3", "table"]):
         if el.name == "h3":
@@ -217,30 +322,23 @@ def parse_page(html: str, canonical: str = "") -> list[str]:
         m = re.search(r"Биньян\s+(\S+)", section)
         binyan = m.group(1) if m else None
         for word, labels, tr in table_forms(el):
-            val: dict = {"pos": pos}
-            if binyan:
-                val["binyan"] = binyan
-            val["canonical"] = canonical
-            val["no_nikud"] = strip_nikud(word)
-            val["form"] = labels
-            if tr:
-                val["transcription"] = tr
-            val["translation"] = translation
-            lines.append(json.dumps({word: val}, ensure_ascii=False))
+            emit(word, labels, tr, binyan)
 
-    # Страницы без таблиц форм (союзы, предлоги...): лемма без ключа form
+    # Страницы без таблиц форм (союзы и т.п.): лемма без ключа form.
+    # Предпочитаем menukad из div.lead (там же транскрипция), иначе h2.
     if not lines and h2:
-        lemma = lemma_from_h2(h2)
+        lemma, tr = "", ""
+        for ld in soup.select("div.lead"):
+            if ld.select_one("span.menukad"):
+                forms = cell_forms(ld)
+                if forms:
+                    words, tr = forms[0]
+                    lemma = words[0]
+                    break
+        if not lemma:
+            lemma = lemma_from_h2(h2)
         if lemma:
-            val = {"pos": pos, "canonical": canonical, "no_nikud": strip_nikud(lemma)}
-            # транскрипция леммы лежит во втором div.lead рядом с формой
-            tr_el = soup.select_one("div.lead div.transcription")
-            if tr_el:
-                tr = transcribe(tr_el.parent)
-                if tr:
-                    val["transcription"] = tr
-            val["translation"] = translation
-            lines.append(json.dumps({lemma: val}, ensure_ascii=False))
+            emit(lemma, None, tr)
     return lines
 
 
