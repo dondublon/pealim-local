@@ -124,6 +124,12 @@ def transcribe(container) -> str:
 def table_forms(table) -> list[tuple[str, list[str], str]]:
     """(слово, подпись формы, транскрипция) для всех ячеек одной таблицы."""
     grid, thead_rows = build_grid(table)
+    # Таблица с местоименными окончаниями: столбцы «Единственное/Множественное
+    # число» — это число владельцев (окончания), а не число самого существительного
+    possessive = any(
+        clean(th.get_text(" ", strip=True)) == "Число существительного"
+        for th in table.select("thead th")
+    )
     out = []
     seen = set()
     for (r, c), cell in sorted(grid.items()):
@@ -135,7 +141,13 @@ def table_forms(table) -> list[tuple[str, list[str], str]]:
         while grid.get((r, c1 + 1)) is cell:
             c1 += 1
         # порядок: сначала столбцы, потом строка
-        labels = column_labels(grid, thead_rows, c, c1) + row_labels(grid, thead_rows, r, c)
+        col_labs = column_labels(grid, thead_rows, c, c1)
+        if possessive:
+            col_labs = [
+                lab + " владельцев" if lab in ("Единственное число", "Множественное число") else lab
+                for lab in col_labs
+            ]
+        labels = col_labs + row_labels(grid, thead_rows, r, c)
         tr = transcribe(cell)
         for w in cell_words(cell):
             out.append((w, labels, tr))
