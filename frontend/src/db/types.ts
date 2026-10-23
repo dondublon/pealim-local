@@ -23,6 +23,10 @@ export interface FormRow {
   transcription: string | null;
   /** Русский перевод. */
   translation: string;
+  /** Корень слова (без огласовок), например "אבב"; "" — сайт не указал. */
+  root: string;
+  /** Примечания о корне/слове; "" — отсутствуют. */
+  description: string;
 }
 
 export interface Dictionary {

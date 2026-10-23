@@ -79,6 +79,12 @@ export default function App() {
                 </span>
                 {row.form && <span className="form">{JSON.stringify(row.form)}</span>}
                 <span className="translation">{row.translation}</span>
+                {row.root && (
+                  <span className="root">
+                    корень: <b>{row.root}</b>
+                  </span>
+                )}
+                {row.description && <span className="description">{row.description}</span>}
               </li>
             ))}
           </ol>

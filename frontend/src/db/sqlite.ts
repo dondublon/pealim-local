@@ -22,9 +22,12 @@ function stripNikud(word: string): string {
 }
 
 const SELECT_SQL = `
-  SELECT word, pos, binyan, canonical, no_nikud, form, transcription, translation
-  FROM forms
-  WHERE no_nikud = ?
+  SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
+         f.transcription, f.translation,
+         g.root, g.description
+  FROM forms f
+  LEFT JOIN general g ON g.canonical = f.canonical
+  WHERE f.no_nikud = ?
 `;
 
 export function createSqliteDictionary(): Dictionary {
@@ -64,6 +67,8 @@ export function createSqliteDictionary(): Dictionary {
             form: r.form ? (JSON.parse(r.form as string) as Record<string, string>) : null,
             transcription: (r.transcription as string) ?? null,
             translation: r.translation as string,
+            root: (r.root as string) ?? '',
+            description: (r.description as string) ?? '',
           });
         }
         return rows;
