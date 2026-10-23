@@ -16,6 +16,7 @@ POS_MAP = {
     "Предлог": "preposition",
     "Местоимение": "pronoun",
     "Числительное": "numeral",
+    "Количественное числительное": "numeral",
     "Союз": "conjunction",
     "Частица": "particle",
     "Междометие": "interjection",
