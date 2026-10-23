@@ -27,6 +27,14 @@ def clean(s: str) -> str:
     return re.sub(r"[​-‏﻿]", "", s).strip()
 
 
+def strip_nikud(w: str) -> str:
+    """Снять знаки огласовок/ударения, сохранив буквы и маqaf (־)."""
+    return "".join(
+        ch for ch in w
+        if not (0x0591 <= ord(ch) <= 0x05C7 and ord(ch) != 0x05BE)
+    )
+
+
 def build_grid(table) -> tuple[dict, int]:
     """Развернуть таблицу в сетку (r, c) -> ячейка. Возвращает сетку и число строк thead."""
     grid: dict = {}
@@ -194,6 +202,7 @@ def parse_page(html: str, canonical: str = "") -> list[str]:
             if binyan:
                 val["binyan"] = binyan
             val["canonical"] = canonical
+            val["no_nikud"] = strip_nikud(word)
             val["form"] = labels
             if tr:
                 val["transcription"] = tr
@@ -204,7 +213,7 @@ def parse_page(html: str, canonical: str = "") -> list[str]:
     if not lines and h2:
         lemma = lemma_from_h2(h2)
         if lemma:
-            val = {"pos": pos, "canonical": canonical}
+            val = {"pos": pos, "canonical": canonical, "no_nikud": strip_nikud(lemma)}
             # транскрипция леммы лежит во втором div.lead рядом с формой
             tr_el = soup.select_one("div.lead div.transcription")
             if tr_el:
