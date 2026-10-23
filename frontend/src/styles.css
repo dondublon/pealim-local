@@ -115,3 +115,40 @@ button:disabled {
   color: #777;
   white-space: pre-line;
 }
+
+a {
+  color: #2f5fa8;
+}
+
+.results .meta a {
+  text-decoration: underline;
+}
+
+.back {
+  margin: 0 0 8px;
+}
+
+.canon-id {
+  font-family: ui-monospace, monospace;
+}
+
+.canon-info {
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #f0f3f8;
+  border-radius: 8px;
+}
+
+.canon-info p {
+  margin: 0 0 8px;
+}
+
+.canon-info p:last-child {
+  margin-bottom: 0;
+}
+
+.canon-info .description {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: pre-line;
+}

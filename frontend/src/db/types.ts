@@ -36,4 +36,10 @@ export interface Dictionary {
    * так и без — никкуд снимается перед обращением к данным.
    */
   searchByNoNikud(query: string): Promise<FormRow[]>;
+
+  /**
+   * Все формы одного слова (страницы): строки, у которых canonical
+   * равен заданному, в порядке их появления на странице.
+   */
+  searchByCanonical(canonical: string): Promise<FormRow[]>;
 }

@@ -21,14 +21,28 @@ function stripNikud(word: string): string {
   return out;
 }
 
-const SELECT_SQL = `
+const SELECT_COLUMNS = `
   SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
          f.transcription, f.translation,
          g.root, g.description
   FROM forms f
   LEFT JOIN general g ON g.canonical = f.canonical
-  WHERE f.no_nikud = ?
 `;
+
+function toFormRow(r: Record<string, unknown>): FormRow {
+  return {
+    word: r.word as string,
+    pos: (r.pos as string) ?? null,
+    binyan: (r.binyan as string) ?? null,
+    canonical: r.canonical as string,
+    no_nikud: r.no_nikud as string,
+    form: r.form ? (JSON.parse(r.form as string) as Record<string, string>) : null,
+    transcription: (r.transcription as string) ?? null,
+    translation: r.translation as string,
+    root: (r.root as string) ?? '',
+    description: (r.description as string) ?? '',
+  };
+}
 
 export function createSqliteDictionary(): Dictionary {
   // Ленивая инициализация: первый поиск = загрузка wasm + 108 МБ базы.
@@ -49,32 +63,33 @@ export function createSqliteDictionary(): Dictionary {
     return dbPromise;
   }
 
-  return {
-    async searchByNoNikud(query: string): Promise<FormRow[]> {
-      const db = await getDb();
-      const stmt = db.prepare(SELECT_SQL);
-      try {
-        stmt.bind([stripNikud(query.trim())]);
-        const rows: FormRow[] = [];
-        while (stmt.step()) {
-          const r = stmt.getAsObject() as Record<string, unknown>;
-          rows.push({
-            word: r.word as string,
-            pos: (r.pos as string) ?? null,
-            binyan: (r.binyan as string) ?? null,
-            canonical: r.canonical as string,
-            no_nikud: r.no_nikud as string,
-            form: r.form ? (JSON.parse(r.form as string) as Record<string, string>) : null,
-            transcription: (r.transcription as string) ?? null,
-            translation: r.translation as string,
-            root: (r.root as string) ?? '',
-            description: (r.description as string) ?? '',
-          });
-        }
-        return rows;
-      } finally {
-        stmt.free();
+  async function query(sql: string, params: string[]): Promise<FormRow[]> {
+    const db = await getDb();
+    const stmt = db.prepare(sql);
+    try {
+      stmt.bind(params);
+      const rows: FormRow[] = [];
+      while (stmt.step()) {
+        rows.push(toFormRow(stmt.getAsObject() as Record<string, unknown>));
       }
+      return rows;
+    } finally {
+      stmt.free();
+    }
+  }
+
+  return {
+    searchByNoNikud(query: string): Promise<FormRow[]> {
+      return query(`${SELECT_COLUMNS} WHERE f.no_nikud = ?`, [
+        stripNikud(query.trim()),
+      ]);
+    },
+
+    searchByCanonical(canonical: string): Promise<FormRow[]> {
+      // id — surrogate PK в порядке загрузки = порядке форм на странице
+      return query(`${SELECT_COLUMNS} WHERE f.canonical = ? ORDER BY f.id`, [
+        canonical.trim(),
+      ]);
     },
   };
 }
