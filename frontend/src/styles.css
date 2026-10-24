@@ -191,6 +191,57 @@ a {
   color: #2f5fa8;
 }
 
+/* --- Предлоги глагола --- */
+
+.prepositions {
+  margin-top: 12px;
+  padding: 10px 12px 6px;
+  background: #f0f3f8;
+  border-radius: 8px;
+}
+
+.prepositions-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.prepositions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.prepositions-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #dce2ec;
+}
+
+.prepositions-list li:last-child {
+  border-bottom: none;
+}
+
+.preposition {
+  min-width: 1.4em;
+  text-align: center;
+  font-weight: 600;
+  color: #2f5fa8;
+  font-size: 1.05rem;
+}
+
+.preposition-comment {
+  color: #777;
+}
+
+.preposition-example {
+  margin-left: auto;
+  color: #333;
+}
+
 .pos-section.stub .status {
   color: #999;
   font-style: italic;

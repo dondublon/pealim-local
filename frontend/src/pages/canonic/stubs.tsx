@@ -35,6 +35,8 @@ export const ConjunctionSection = ({ rows }: Props) => <Stub title="Союз" ro
 
 export const InterjectionSection = ({ rows }: Props) => <Stub title="Междометие" rows={rows} />;
 
+export const NameSection = ({ rows }: Props) => <Stub title="Имя" rows={rows} />;
+
 /** Часть речи не указана сайтом (יֵשׁ, אֵין) или неизвестна. */
 export const UnspecifiedSection = ({ pos, rows }: { pos: string; rows: FormRow[] }) => (
   <Stub title={pos || 'Часть речи не указана'} rows={rows} />

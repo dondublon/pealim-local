@@ -1,9 +1,11 @@
 import type { FormRow } from '../../db';
 import BinyanBlock from './BinyanBlock';
+import PrepositionList from './PrepositionList';
 
 /**
- * Секция «Глагол»: строки делятся на биньяны (в порядке появления
- * форм на странице), каждый биньян — отдельный BinyanBlock.
+ * Секция «Глагол»: сверху — предлоги глагола (если заполнены), далее
+ * строки делятся на биньяны (в порядке появления форм на странице),
+ * каждый биньян — отдельный BinyanBlock.
  */
 export default function VerbSection({ rows }: { rows: FormRow[] }) {
   const groups: { binyan: string | null; rows: FormRow[] }[] = [];
@@ -20,9 +22,13 @@ export default function VerbSection({ rows }: { rows: FormRow[] }) {
     group.rows.push(row);
   }
 
+  // предлоги одинаковы для всех строк canonical — берём из первой
+  const prepositions = rows[0]?.prepositions ?? null;
+
   return (
     <section className="pos-section">
       <h2 className="pos-title">Глагол</h2>
+      {prepositions && <PrepositionList items={prepositions} />}
       {groups.map((g) => (
         <BinyanBlock key={g.binyan ?? '—'} name={g.binyan} rows={g.rows} />
       ))}

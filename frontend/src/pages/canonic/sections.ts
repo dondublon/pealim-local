@@ -6,6 +6,7 @@ import {
   AdverbSection,
   ConjunctionSection,
   InterjectionSection,
+  NameSection,
   NounSection,
   NumeralSection,
   ParticleSection,
@@ -29,6 +30,7 @@ export const SECTION_BY_POS: Record<string, ComponentType<SectionProps>> = {
   particle: ParticleSection,
   conjunction: ConjunctionSection,
   interjection: InterjectionSection,
+  name: NameSection,
 };
 
 /**
@@ -47,6 +49,7 @@ export const POS_ORDER = [
   'particle',
   'conjunction',
   'interjection',
+  'name',
 ] as const;
 
 /** Отсортированные ключи pos, реально присутствующие в строках. */

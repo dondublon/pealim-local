@@ -11,7 +11,7 @@
 import type { Dictionary } from './types';
 import { createWorkerDictionary } from './workerClient';
 
-export type { Dictionary, FormRow } from './types';
+export type { Dictionary, FormRow, PrepositionEntry } from './types';
 
 let instance: Dictionary | undefined;
 

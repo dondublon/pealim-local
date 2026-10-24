@@ -6,6 +6,17 @@
  */
 
 /** Строка таблицы forms. */
+
+/** Одна запись из general.prepositions (заполняется ollama, см. llm/fill_prepositions.py). */
+export interface PrepositionEntry {
+  /** Сам предлог на иврите, например "על". */
+  prep: string;
+  /** Пример сочетания «глагол + предлог» на иврите. */
+  example: string;
+  /** Короткий русский комментарий к значению сочетания. */
+  comment: string;
+}
+
 export interface FormRow {
   /** Форма слова с огласовками, например "אָבִּים". */
   word: string;
@@ -33,6 +44,11 @@ export interface FormRow {
    * Отсутствует у строк точного совпадения.
    */
   via_prefix?: string;
+  /**
+   * Предлоги глагола (только canonical с заполненным general.prepositions);
+   * null — не заполнено / не глагол.
+   */
+  prepositions: PrepositionEntry[] | null;
 }
 
 export interface Dictionary {

@@ -10,29 +10,36 @@ import type { Database } from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { prefixExtras } from './prefixes';
 import type { SearchMethod, SearchRequest, SearchResponse } from './protocol';
-import type { FormRow } from './types';
+import type { FormRow, PrepositionEntry } from './types';
 
 const DB_URL = '/pealim_ru.db';
 
+const SELECT_COLUMNS = `
+    SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
+           f.transcription, f.translation,
+           g.root, g.description, g.prepositions
+    FROM forms f
+    LEFT JOIN general g ON g.canonical = f.canonical
+`;
+
 const SQL: Record<SearchMethod, string> = {
-  searchByNoNikud: `
-    SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
-           f.transcription, f.translation,
-           g.root, g.description
-    FROM forms f
-    LEFT JOIN general g ON g.canonical = f.canonical
-    WHERE f.no_nikud = ?
-  `,
-  searchByCanonical: `
-    SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
-           f.transcription, f.translation,
-           g.root, g.description
-    FROM forms f
-    LEFT JOIN general g ON g.canonical = f.canonical
-    WHERE f.canonical = ?
-    ORDER BY f.id
-  `,
+  searchByNoNikud: `${SELECT_COLUMNS} WHERE f.no_nikud = ?`,
+  searchByCanonical: `${SELECT_COLUMNS} WHERE f.canonical = ? ORDER BY f.id`,
 };
+
+/** general.prepositions — JSON {"verb":…, "prepositions":[…]}; разбираем в список. */
+function parsePrepositions(raw: unknown): PrepositionEntry[] | null {
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const list = Array.isArray(parsed)
+      ? parsed
+      : (parsed as { prepositions?: unknown })?.prepositions;
+    return Array.isArray(list) && list.length > 0 ? (list as PrepositionEntry[]) : null;
+  } catch {
+    return null;
+  }
+}
 
 function toFormRow(r: Record<string, unknown>): FormRow {
   return {
@@ -46,6 +53,7 @@ function toFormRow(r: Record<string, unknown>): FormRow {
     translation: r.translation as string,
     root: (r.root as string) ?? '',
     description: (r.description as string) ?? '',
+    prepositions: parsePrepositions(r.prepositions),
   };
 }
 
@@ -53,7 +61,9 @@ let dbPromise: Promise<Database> | null = null;
 
 async function loadDb(): Promise<Database> {
   const SQLjs = await initSqlJs({ locateFile: () => wasmUrl });
-  const resp = await fetch(DB_URL);
+  // no-store: всегда брать актуальный файл — воркер живёт одну вкладку,
+  // а БД меняется на лету (заливка предлогов); кеш браузера дал бы снапшот.
+  const resp = await fetch(DB_URL, { cache: 'no-store' });
   if (!resp.ok) {
     throw new Error(`не удалось загрузить ${DB_URL}: HTTP ${resp.status}`);
   }
