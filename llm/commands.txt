@@ -1,0 +1,3 @@
+tail -f logs/fill_prepositions.log          # ход заливки
+kill -INT $(cat logs/fill_prepositions.pid) # мягкая остановка (позиция сохранится)
+tail -1 status_prepositions.txt             # текущая позиция
