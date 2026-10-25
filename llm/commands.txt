@@ -1,3 +1,12 @@
 tail -f logs/fill_prepositions.log          # ход заливки
 kill -INT $(cat logs/fill_prepositions.pid) # мягкая остановка (позиция сохранится)
 tail -1 status_prepositions.txt             # текущая позиция
+
+
+Прямой запуск работает: из корневого каталога ~/storage/projects/pealim —
+uv run python llm/fill_prepositions.py
+Скрипт использует пути относительно текущей каталога (pealim_ru.db, forms_ru.jsonl, status_prepositions.txt), поэтому запускать строго из корня, не из llm/.
+Но предпочитаемый способ — ./run_fill_prepositions.sh, потому что он:
+1. поднимает SSH-туннель к ollama (localhost:11435), если упал;
+2. не даёт запустить вторую копию (проверка pid-файла);
+3. пишет лог и pid в logs/.
