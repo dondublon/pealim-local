@@ -17,8 +17,6 @@ function Stub({ title, rows }: { title: string; rows: Props['rows'] }) {
   );
 }
 
-export const NounSection = ({ rows }: Props) => <Stub title="Существительное" rows={rows} />;
-
 export const AdjectiveSection = ({ rows }: Props) => <Stub title="Прилагательное" rows={rows} />;
 
 export const AdverbSection = ({ rows }: Props) => <Stub title="Наречие" rows={rows} />;

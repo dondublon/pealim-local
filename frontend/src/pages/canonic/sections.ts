@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { FormRow } from '../../db';
+import NounSection from './NounSection';
 import VerbSection from './VerbSection';
 import {
   AdjectiveSection,
@@ -7,7 +8,6 @@ import {
   ConjunctionSection,
   InterjectionSection,
   NameSection,
-  NounSection,
   NumeralSection,
   ParticleSection,
   PrepositionSection,

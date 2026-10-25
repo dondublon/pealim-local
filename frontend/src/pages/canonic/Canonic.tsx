@@ -72,6 +72,9 @@ export default function Canonic({ canonical }: { canonical: string }) {
         <>
           <section className="canon-info">
             <p className="translation">{status.rows[0].translation}</p>
+            {status.rows[0].gender && (
+              <p className="gender">{status.rows[0].gender}</p>
+            )}
             {status.rows[0].root && (
               <p className="root">
                 корень: <b>{status.rows[0].root}</b>

@@ -17,7 +17,7 @@ const DB_URL = '/pealim_ru.db';
 const SELECT_COLUMNS = `
     SELECT f.word, f.pos, f.binyan, f.canonical, f.no_nikud, f.form,
            f.transcription, f.translation,
-           g.root, g.description, g.prepositions
+           g.root, g.description, g.prepositions, g.gender
     FROM forms f
     LEFT JOIN general g ON g.canonical = f.canonical
 `;
@@ -53,6 +53,7 @@ function toFormRow(r: Record<string, unknown>): FormRow {
     translation: r.translation as string,
     root: (r.root as string) ?? '',
     description: (r.description as string) ?? '',
+    gender: (r.gender as string) ?? null,
     prepositions: parsePrepositions(r.prepositions),
   };
 }

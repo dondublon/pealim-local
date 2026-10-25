@@ -1,7 +1,9 @@
 """Загрузка forms_ru.jsonl + forms_general_ru.jsonl в SQLite (pealim_ru.db).
 
 Схема:
-  general  — canonical (PK, ключ файла), root (≤6), description (≤512)
+  general  — canonical (PK, ключ файла), root (≤6), description (≤512),
+             prepositions (JSON-массив предлогов, nullable),
+             gender («Мужской род»/«Женский род», из noun-строк forms, nullable)
   forms    — id (surrogate PK), слово и все поля формы;
              индексы: canonical, pos, no_nikud (неуникальные)
 """
@@ -25,9 +27,11 @@ def build_schema(con: sqlite3.Connection) -> None:
     con.executescript(
         """
         CREATE TABLE general (
-            canonical   TEXT PRIMARY KEY,
-            root        TEXT NOT NULL DEFAULT '' CHECK (length(root) <= 6),
-            description TEXT NOT NULL DEFAULT '' CHECK (length(description) <= 512)
+            canonical    TEXT PRIMARY KEY,
+            root         TEXT NOT NULL DEFAULT '' CHECK (length(root) <= 6),
+            description  TEXT NOT NULL DEFAULT '' CHECK (length(description) <= 512),
+            prepositions TEXT,
+            gender       TEXT CHECK (gender IS NULL OR length(gender) <= 32)
         );
 
         CREATE TABLE forms (
@@ -50,9 +54,30 @@ def load_general(con: sqlite3.Connection) -> int:
     with open(GENERAL_JSONL, encoding="utf-8") as f:
         for line in f:
             (canonical, v), = json.loads(line).items()
-            rows.append((canonical, v["root"], v["description"]))
-    con.executemany("INSERT INTO general VALUES (?,?,?)", rows)
+            preps = v.get("prepositions") or []
+            # в колонку кладём только массив, без обёртки {"verb":…, "prepositions":…}
+            preps_json = json.dumps(preps, ensure_ascii=False) if preps else None
+            rows.append((canonical, v["root"], v["description"], preps_json, None))
+    con.executemany("INSERT INTO general VALUES (?,?,?,?,?)", rows)
     return len(rows)
+
+
+def load_gender(con: sqlite3.Connection) -> int:
+    """gender из noun-строк forms_ru.jsonl → general.gender (по canonical)."""
+    genders: dict[str, str] = {}
+    with open(FORMS_JSONL, encoding="utf-8") as f:
+        for line in f:
+            (word, v), = json.loads(line).items()
+            if v.get("pos") != "noun":
+                continue
+            gender = v.get("gender")
+            if gender and v["canonical"] not in genders:
+                genders[v["canonical"]] = gender
+    con.executemany(
+        "UPDATE general SET gender = ? WHERE canonical = ?",
+        [(g, c) for c, g in genders.items()],
+    )
+    return len(genders)
 
 
 def load_forms(con: sqlite3.Connection) -> int:
@@ -91,6 +116,7 @@ def main() -> None:
     build_schema(con)
     n_gen = load_general(con)
     n_forms = load_forms(con)
+    n_gender = load_gender(con)
 
     # индексы после загрузки — быстрее, чем при вставке
     con.executescript(
@@ -104,7 +130,7 @@ def main() -> None:
     con.execute("VACUUM")
     con.close()
 
-    print(f"general: {n_gen} строк")
+    print(f"general: {n_gen} строк (gender заполнен у {n_gender})")
     print(f"forms:   {n_forms} строк")
     print(f"{DB}: {os.path.getsize(DB) / 1e6:.1f} МБ")
 

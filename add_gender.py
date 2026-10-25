@@ -37,22 +37,33 @@ CONCURRENCY = 6
 MALE, FEMALE = "Мужской род", "Женский род"
 
 
-def parse_gender(html: str) -> str | None:
-    """Род из первого <p> после h2: «Существительное – …, мужской род»."""
-    soup = BeautifulSoup(html, "lxml")
-    h2 = soup.select_one("h2.page-header")
-    if h2 is None:
-        return None
-    p = h2.find_next_sibling("p")
-    if p is None:
-        return None
-    txt = p.get_text(" ", strip=True)
+def _gender_from_text(txt: str) -> str | None:
     m, f = txt.find("мужской род"), txt.find("женский род")
     if m < 0 and f < 0:
         return None
     if m >= 0 and (f < 0 or m <= f):
         return MALE
     return FEMALE
+
+
+def parse_gender(html: str) -> str | None:
+    """Род: сначала первый <p> («Существительное – …, мужской род»),
+    иначе — любой другой <p> на странице. Заголовки таблиц (th) не
+    смотрим: там «мужской род» — род владельца окончания, не существительного."""
+    soup = BeautifulSoup(html, "lxml")
+    h2 = soup.select_one("h2.page-header")
+    if h2 is None:
+        return None
+    p = h2.find_next_sibling("p")
+    if p is not None:
+        g = _gender_from_text(p.get_text(" ", strip=True))
+        if g:
+            return g
+    for para in soup.find_all("p"):
+        g = _gender_from_text(para.get_text(" ", strip=True))
+        if g:
+            return g
+    return None
 
 
 def collect_noun_canonicals(path: str) -> list[str]:
@@ -69,35 +80,41 @@ def collect_noun_canonicals(path: str) -> list[str]:
 async def fetch_genders(canons: list[str], cache: dict) -> tuple[int, list[str]]:
     """Запрос страниц; возвращает (сколько запросов, список неудач/без рода)."""
     sem = asyncio.Semaphore(CONCURRENCY)
-    failed: list[str] = []
+    no_gender: list[str] = []
+    errors: list[str] = []
     done_count = 0
 
     async def one(client: httpx.AsyncClient, canon: str) -> None:
         nonlocal done_count
         async with sem:
-            for attempt in range(3):
+            for attempt in range(4):
                 try:
                     r = await client.get(BASE + canon + "/")
+                    r.raise_for_status()  # 429/5xx не считаем «без рода»
                     g = parse_gender(r.text)
-                    if g:
-                        cache[canon] = g
-                    else:
-                        failed.append(canon)
+                    # null кешируется: страница действительно без рода,
+                    # переспрашивать её не будем; ошибки не кешируем
+                    cache[canon] = g
+                    if g is None:
+                        no_gender.append(canon)
                     break
                 except Exception:
-                    if attempt == 2:
-                        failed.append(canon)
+                    if attempt == 3:
+                        errors.append(canon)
                     else:
-                        await asyncio.sleep(2 * (attempt + 1))
+                        await asyncio.sleep(3 * (attempt + 1))
             done_count += 1
             if done_count % 100 == 0:
                 print(f"  запрошено {done_count}/{len(canons)}", flush=True)
+            await asyncio.sleep(0.1)  # мягче к сайту
 
     t0 = time.time()
     async with httpx.AsyncClient(timeout=30, headers=HEADERS, follow_redirects=True) as client:
         await asyncio.gather(*(one(client, c) for c in canons))
     print(f"  запросов: {len(canons)}, {time.time() - t0:.0f} с")
-    return len(canons), failed
+    print(f"  без рода (кешировано null): {len(no_gender)}", no_gender[:10])
+    print(f"  ошибок сети (будут повторены): {len(errors)}", errors[:10])
+    return len(canons), errors
 
 
 def load_cache() -> dict:
