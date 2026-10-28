@@ -49,3 +49,10 @@ npm run build      # typecheck (tsc) + production-сборка
   `frontend/public/pealim_ru.db` → `../pealim_ru.db`.
 - Доступ к данным изолирован в `frontend/src/db/` (интерфейс `Dictionary`);
   для замены на REST-бэкенд достаточно поменять `frontend/src/db/index.ts`.
+
+
+Files to download: 
+pealim_ru.db: https://drive.google.com/file/d/1XDFahujJ_XCaSHEvQd_ewQU379g4Lvqr/view?usp=sharing
+Its recommended to make a hard file link to connect to the frontend.
+forms_ru.jsonl: https://drive.google.com/file/d/1Ud0uDLRkozEfYzHbsHynLvaP-E9I-RLF/view?usp=sharing
+forms_general_ru.jsonl: https://drive.google.com/file/d/1RttyzH-kta80iXK9ZXGjpV7qTzhOV0am/view?usp=sharing
